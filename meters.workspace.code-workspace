@@ -4,5 +4,8 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.jediEnabled": true,
+		"python.pythonPath": "${workspaceRoot}/env/bin/python3.8"
+	}
 }
