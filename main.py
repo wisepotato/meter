@@ -1,6 +1,3 @@
-#!/home/harro/meter/env/bin/python3
-# Python script om P1 telegram weer te geven
- 
 import re
 import serial
  
