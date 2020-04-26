@@ -42,14 +42,12 @@ class DmsrFourTelegram:
 
 class DsmrInfo:
 
-    def __init__(self, variable: str, search_for: str, occurence_number: str, unit: str):
+    def __init__(self, variable: str, search_for: str,  unit: str):
         self.variable_name = variable
         self.search_for = search_for
-        self.occurence_number = occurence_number
         self.unit = unit
     variable_name: str
     search_for: str
-    occurence_number: str
     unit: str
 
 class DsmrFour():
@@ -76,11 +74,10 @@ class DsmrFour():
             for text in self.lines:
                 if finder.search_for in text:
                     groups = re.findall(r'\((.*?)\)',text)
-                    text_thing = str(groups[finder.occurence_number])
-                    if text_thing.endswith(f"*{finder.unit}"):
-                        text_thing = text_thing.replace(f"*{finder.unit}", "")
-                    actual_float = float(text_thing)
-                    print(f"{finder.variable_name} - {actual_float}")
+
+                    text = [group.replace(f"*{finder.unit}", "") for group in groups if str(group).endswith(f"*{finder.unit}")][0]
+                    actual_float = float(text)
+                    print(f"{finder.variable_name} - {actual_float} {finder.unit}")
 
     def print_lines(self) -> None:
         for line in self.lines:
@@ -93,7 +90,7 @@ class DsmrFour():
     @contextlib.contextmanager
     def start(self) -> 'DsmrFour':
         self._serial.open()
-
+        self.lines = []
         while  True:
             telegram_line = self._serial.readline()
             telegram_line = telegram_line.decode('ascii').strip()
@@ -108,8 +105,10 @@ class DsmrFour():
 
 dsmr = DsmrFour(serial.Serial())
 data_units = [
-    DsmrInfo(variable="total_gas", search_for="0-1:24.2.1", occurence_number=1, unit="m3"),
-
+    DsmrInfo(variable="total_gas", search_for="0-1:24.2.1", unit="m3"),
+    DsmrInfo(variable="current_electricity", search_for="1-0:1.7.0",  unit="kW"),
+    DsmrInfo(variable="total_electricity_high", search_for="1-0:1.8.1", unit="kWh"),
+    DsmrInfo(variable="total_electricity_low", search_for="1-0:1.8.2",unit="kWh"),
 ]
 
 for du in data_units:
@@ -117,8 +116,6 @@ for du in data_units:
 
 while True:
     with dsmr.start() as dsmr:
-        dsmr.lines
-        dsmr.print_lines()    
         dsmr.interpret()
     
 

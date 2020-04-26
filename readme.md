@@ -8,3 +8,7 @@ This project reads out your dutch meter and puts it into an InfluxDB.
 ## init
 
 * Uses python3.8
+
+
+## Environment Variables
+
