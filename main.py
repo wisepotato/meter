@@ -33,14 +33,42 @@ from typing import List
 #     current_wattages = []
 #     client.write_points(json_body)
 
+class DsmrFour():
+    _serial : serial.Serial
+    _lines: List[str] = []
 
+
+    
+
+
+    def __init__(self, ser: serial.Serial):
+        ser.baudrate = 115200
+        ser.bytesize =serial.EIGHTBITS
+        ser.parity = serial.PARITY_NONE
+        ser.stopbits = serial.STOPBITS_ONE
+        ser.xonxoff = 0
+        ser.rtscts = 0
+        ser.timeout = 12
+                
+        ser.port = "/dev/ttyUSB0"
+        self._serial = ser
+    
+    def print_lines(self) -> None:
+        for line in self._lines:
+            print(line)
+    def append_line(self, line: str) -> None:
+        self._lines.append(line)
+
+    def get_serial(self) -> serial.Serial:
+        return self._serial
 
 class SerialContainer(object):
-    _lines: List[str]
+    _lines: List[str] = []
     _serial: serial.Serial
 
-    def __init__(self, serial: serial.Serial):
-        self._serial = serial
+    def __init__(self, dsmr: DsmrFour):
+        self._serial = dsmr.get_serial()
+        self._dsmr = dsmr
 
     def __enter__(self) -> 'SerialContainer':
         self._serial.open()
@@ -48,34 +76,20 @@ class SerialContainer(object):
         while  True:
             telegram_line = ser.readline()
             telegram_line = telegram_line.decode('ascii').strip()
-
-            # Check wanneer het uitroepteken ontvangen wordt (einde telegram)
-            if re.match('(?=!)', telegram_line):
+            if self.end_of_telegram(telegram_line):
                 break
             else:
-                self._lines.append(telegram_line)
+                self._dsmr.append_line(telegram_line)
 
         return self
+
+    def end_of_telegram(self, line: str) -> bool:
+        return re.match('(?=!)', line)
 
     def __exit__(self, type, value, traceback):
         self._serial.close()
 
-class DsmrFour():
-    _serial : serial.Serial
-    def __init__(self, serial: serial.Serial):
-        serial.baudrate = 115200
-        serial.bytesize =serial.EIGHTBITS
-        serial.parity = serial.PARITY_NONE
-        serial.stopbits = serial.STOPBITS_ONE
-        ser.xonxoff = 0
-        ser.rtscts = 0
-        ser.timeout = 12
-                
-        ser.port = "/dev/ttyUSB0"
-        self._serial = serial
 
-    def get_serial(self) -> serial.Serial:
-        self._serial
 
 ser = serial.Serial()
 dsmr = DsmrFour(ser)
@@ -83,7 +97,7 @@ dsmr = DsmrFour(ser)
 while True:
 
     with SerialContainer(dsmr)  as sc:
-        print(sc._lines)
+        sc._dsmr.print_lines()
 
 
 
