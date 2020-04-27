@@ -53,6 +53,7 @@ class DsmrInfo:
 class DsmrFour():
     _serial : serial.Serial
     lines: List[str] = []
+    ending_character: str = "!"
 
     _registrations: List[DsmrInfo] = []
     def __init__(self, ser: serial.Serial):
@@ -84,7 +85,7 @@ class DsmrFour():
             print(line)
 
     def end_of_telegram(self, line: str) -> bool:
-        return re.match('(?=!)', line)
+        return self.ending_character in line
 
 
     @contextlib.contextmanager
