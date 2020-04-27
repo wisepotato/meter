@@ -3,9 +3,39 @@ import serial
 from statistics import mean
 from datetime import datetime
 from typing import List
-
+from dotenv import load_dotenv
 import contextlib
+from dataclasses import dataclass
 
+
+load_dotenv()
+
+# Settings
+import os
+database_type = os.getenv("db.type")
+database_host = os.getenv("db.hostname")
+database_port = os.getenv("db.port")
+database_username = os.getenv("db.username")
+database_password = os.getenv("db.password")
+database_database = os.getenv("db.database")
+
+allowed_database_types = ['influx']
+
+if database_type not in allowed_database_types:
+    raise Exception(f"The database_type {database_type} is not allowed. Allowed types: {allowed_database_types}")
+
+
+
+
+from influxdb import InfluxDBClient
+
+client = InfluxDBClient(
+    host=database_host,
+    port=database_port,
+    username=database_username,
+    password=database_password,
+    database=database_database
+    )
 
 
 # client = InfluxDBClient()
@@ -40,15 +70,12 @@ class DmsrFourTelegram:
     total_usage_electricity_low: float
     total_usage_electricity_high: float
 
+@dataclass
 class DsmrInfo:
-
-    def __init__(self, variable: str, search_for: str,  unit: str):
-        self.variable_name = variable
-        self.search_for = search_for
-        self.unit = unit
     variable_name: str
     search_for: str
     unit: str
+
 
 class DsmrFour():
     _serial : serial.Serial
@@ -70,15 +97,21 @@ class DsmrFour():
     def register(self,data_unit: DsmrInfo)  -> None:
         self._registrations.append(data_unit)
 
-    def interpret(self) -> None:
+    def interpret(self) -> List:
+        data = []
         for finder in self._registrations:
             for text in self.lines:
                 if finder.search_for in text:
-                    groups = re.findall(r'\((.*?)\)',text)
+                    groups = re.findall(rf'([0-9]+[\.]+[0-9]*\*{finder.unit})',text)
 
                     text = [group.replace(f"*{finder.unit}", "") for group in groups if str(group).endswith(f"*{finder.unit}")][0]
                     actual_float = float(text)
-                    print(f"{finder.variable_name} - {actual_float} {finder.unit}")
+                    data.append({
+                        'variable_name' : finder.variable_name,
+                        'value' : actual_float,
+                        'unit' : finder.unit
+                    })
+        return data
 
     def print_lines(self) -> None:
         for line in self.lines:
@@ -117,7 +150,7 @@ for du in data_units:
 
 while True:
     with dsmr.start() as dsmr:
-        dsmr.interpret()
+        data = dsmr.interpret()
     
 
 
