@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  meter:
+    build:
+      context: ./
+      dockerfile: ./dockerfile
+    volumes:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    restart: always
