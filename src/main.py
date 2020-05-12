@@ -4,14 +4,14 @@ from statistics import mean
 from datetime import datetime
 from typing import List
 from dotenv import load_dotenv
-import contextlib
 from dataclasses import dataclass
+import os
+from influxdb import InfluxDBClient
 
 
 load_dotenv()
 
 # Settings
-import os
 database_type = os.getenv("DB_TYPE")
 database_host = os.getenv("DB_HOSTNAME")
 database_port = int(os.getenv("DB_PORT"))
@@ -24,8 +24,6 @@ allowed_database_types = ['influxdb']
 if database_type not in allowed_database_types:
     raise Exception(f"The database_type {database_type} is not allowed. Allowed types: {allowed_database_types}")
 
-from influxdb import InfluxDBClient
-
 client = InfluxDBClient(
     host=database_host,
     port=database_port,
@@ -34,13 +32,6 @@ client = InfluxDBClient(
     database=database_database
 )
 
-class InfluxImporter:
-    client: InfluxDBClient
-
-    def __init__(self, client: InfluxDBClient):
-        self.client = client
-
-    
 current_wattages = []
 
 def process_reading(watt_current: float, watt_total_low: float, watt_total_high: float, total_gas: float) -> None:
@@ -65,17 +56,11 @@ def process_reading(watt_current: float, watt_total_low: float, watt_total_high:
     current_wattages = []
     client.write_points(json_body)
 
-class DmsrFourTelegram:
-    current_usage_electricity: float
-    total_usage_electricity_low: float
-    total_usage_electricity_high: float
-
 @dataclass
 class DsmrInfo:
     variable_name: str
     search_for: str
     unit: str
-
 
 class DsmrFour():
     _serial : serial.Serial
@@ -152,7 +137,6 @@ for du in data_units:
 def get_reading(data: List, name: str):
     return list(filter(lambda x: x["variable_name"] == name, data))[0]["value"]
 
-#def process_reading(watt_current: float, watt_total_low: float, watt_total_high: float, total_gas: float) -> None:
 while True:
     dsmr.wait_for_telegram_and_load()
     lines = dsmr.get_lines()

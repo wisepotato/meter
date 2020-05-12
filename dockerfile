@@ -3,9 +3,9 @@ from python:3.8-alpine
 # create app directory
 WORKDIR /app
 
-COPY src/main.py ./
 COPY requirements.txt ./
-run pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
+COPY src/main.py ./
 
 CMD ["python", "-u", "main.py"]

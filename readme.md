@@ -12,3 +12,9 @@ This project reads out your dutch meter and puts it into an InfluxDB.
 
 ## Environment Variables
 
+* DB_TYPE (currently only influxdb is supported)
+* DB_HOSTNAME
+* DB_PORT
+* DB_USERNAME
+* DB_PASSWORD
+* DB_DATABASE
