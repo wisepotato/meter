@@ -12,12 +12,12 @@ load_dotenv()
 
 # Settings
 import os
-database_type = os.getenv("db.type")
-database_host = os.getenv("db.hostname")
-database_port = int(os.getenv("db.port"))
-database_username = os.getenv("db.username")
-database_password = os.getenv("db.password")
-database_database = os.getenv("db.database")
+database_type = os.getenv("DB_TYPE")
+database_host = os.getenv("DB_HOSTNAME")
+database_port = int(os.getenv("DB_PORT"))
+database_username = os.getenv("DB_USERNAME")
+database_password = os.getenv("DB_PASSWORD")
+database_database = os.getenv("DB_DATABASE")
 
 allowed_database_types = ['influxdb']
 
@@ -41,29 +41,29 @@ class InfluxImporter:
         self.client = client
 
     
-# current_wattages = []
+current_wattages = []
 
-# def add_wattage(watt_current: float, watt_total_low: float, watt_total_high: float) -> None:
-#   global current_wattages
-#   current_date = datetime.now().isoformat()
-#   current_wattages.append(watt_current)
-#   if len(current_wattages) == 10:
-#     # done with a minute, lets write
-#     avg = mean(current_wattages)
-#     json_body = [
-#       {
-#           "measurement": "energy",
-#           "time": current_date,
-#           "fields": {
-#               "watt_current": float(avg),
-#               "watt_total_low": watt_total_low,
-#               "watt_total_low": watt_total_high
-#           }
-#       }
-#     ]
-#     current_wattages = []
-#     client.write_points(json_body)
-
+def process_reading(watt_current: float, watt_total_low: float, watt_total_high: float, total_gas: float) -> None:
+  global current_wattages
+  current_date = datetime.now().isoformat()
+  current_wattages.append(watt_current)
+  if len(current_wattages) == 10:
+    # done with a minute, lets write
+    avg = mean(current_wattages)
+    json_body = [
+      {
+          "measurement": "energy",
+          "time": current_date,
+          "fields": {
+              "current_electricity_kw": float(avg),
+              "total_electricity_low_kwh": watt_total_low,
+              "total_electricity_high_kwh": watt_total_high,
+              "total_gas_m3": total_gas,
+          }
+      }
+    ]
+    current_wattages = []
+    client.write_points(json_body)
 
 class DmsrFourTelegram:
     current_usage_electricity: float
@@ -85,7 +85,7 @@ class DsmrFour():
     _registrations: List[DsmrInfo] = []
     def __init__(self, ser: serial.Serial):
         ser.baudrate = 115200
-        ser.bytesize =serial.EIGHTBITS
+        ser.bytesize = serial.EIGHTBITS
         ser.parity = serial.PARITY_NONE
         ser.stopbits = serial.STOPBITS_ONE
         ser.xonxoff = 0
@@ -149,8 +149,18 @@ data_units = [
 for du in data_units:
     dsmr.register(du)
 
+def get_reading(data: List, name: str):
+    return list(filter(lambda x: x["variable_name"] == name, data))[0]["value"]
+
+#def process_reading(watt_current: float, watt_total_low: float, watt_total_high: float, total_gas: float) -> None:
 while True:
     dsmr.wait_for_telegram_and_load()
     lines = dsmr.get_lines()
     interpreted = dsmr.interpret(lines)
     print(interpreted)
+    process_reading(
+            watt_current=get_reading(interpreted, "current_electricity"),
+            watt_total_low=get_reading(interpreted, "total_electricity_low"),
+            watt_total_high=get_reading(interpreted, "total_electricity_high"),
+            total_gas=get_reading(interpreted, "total_gas")
+            )
