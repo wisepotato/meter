@@ -2,7 +2,8 @@ version: '3'
 
 services:
   meter:
-    container_name: meter
+    container_name: wisepotato/meter:latest
+    image: wisepotato/meter:latest
     build:
       context: ./
       dockerfile: ./dockerfile
@@ -10,7 +11,6 @@ services:
       - /dev/ttyUSB0:/dev/ttyUSB0
     restart: unless-stopped
     network_mode: bridge
-    dns: 192.168.1.30
     environment:
       - DB_TYPE=influxdb
       - DB_HOSTNAME=192.168.1.30
