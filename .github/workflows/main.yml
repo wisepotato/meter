@@ -17,6 +17,7 @@ jobs:
     - name: Run a multi-line script
       env:
         DOCKER_USERNAME: wisepotato
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       run: |
         echo $GITHUB_WORKSPACE
         cd $GITHUB_WORKSPACE
