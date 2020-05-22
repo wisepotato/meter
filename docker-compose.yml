@@ -2,7 +2,8 @@ version: '3'
 
 services:
   meter:
-    container_name: meter
+    container_name: wisepotato/meter:latest
+    image: wisepotato/meter:latest
     build:
       context: ./
       dockerfile: ./dockerfile
