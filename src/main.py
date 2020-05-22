@@ -1,7 +1,7 @@
 import re
 import serial
 from statistics import mean
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 from dotenv import load_dotenv
 from dataclasses import dataclass
@@ -19,6 +19,12 @@ database_username = os.getenv("DB_USERNAME")
 database_password = os.getenv("DB_PASSWORD")
 database_database = os.getenv("DB_DATABASE")
 
+current_data_interval_seconds = os.getenv("CURRENT_DATA_INTERVAL_SECONDS")
+if current_data_interval_seconds is not None:
+    current_data_interval_seconds = timedelta(0, int(current_data_interval_seconds))
+total_data_interval_seconds = os.getenv("TOTAL_DATA_INTERVAL_SECONDS")
+total_data_interval_seconds = timedelta(0, int(total_data_interval_seconds) if total_data_interval_seconds is not None else 300)
+
 allowed_database_types = ['influxdb']
 
 if database_type not in allowed_database_types:
@@ -33,27 +39,45 @@ client = InfluxDBClient(
 )
 
 current_wattages = []
+last_current_data_timestamp = datetime.now()
+last_total_data_timestamp = datetime.now()
 
 def process_reading(watt_current: float, watt_total_low: float, watt_total_high: float, total_gas: float) -> None:
-  global current_wattages
-  current_date = datetime.now().isoformat()
+  global current_wattages, last_current_data_timestamp, last_total_data_timestamp
+  global current_data_interval_seconds, total_data_interval_seconds
+  current_date = datetime.now()
   current_wattages.append(watt_current)
-  if len(current_wattages) == 10:
-    # done with a minute, lets write
+
+  if current_data_interval_seconds is None or last_current_data_timestamp + current_data_interval_seconds < current_date:
+    last_current_data_timestamp = current_date
     avg = mean(current_wattages)
     json_body = [
       {
           "measurement": "energy",
-          "time": current_date,
+          "time": current_date.isoformat(),
           "fields": {
-              "current_electricity_kw": float(avg),
-              "total_electricity_low_kwh": watt_total_low,
-              "total_electricity_high_kwh": watt_total_high,
-              "total_gas_m3": total_gas,
+              "current_electricity_kw": float(avg)
           }
       }
     ]
+    print(datetime.now(), "Writing current usage", json_body)
     current_wattages = []
+    client.write_points(json_body)
+
+  if last_total_data_timestamp + total_data_interval_seconds < current_date:
+    last_total_data_timestamp = current_date
+    json_body = [
+      {
+          "measurement": "energy",
+          "time": current_date.isoformat(),
+          "fields": {
+              "total_electricity_low_kwh": watt_total_low,
+              "total_electricity_high_kwh": watt_total_high,
+              "total_gas_m3": total_gas
+          }
+      }
+    ]
+    print(datetime.now(), "Writing totals", json_body)
     client.write_points(json_body)
 
 @dataclass
@@ -141,7 +165,7 @@ while True:
     dsmr.wait_for_telegram_and_load()
     lines = dsmr.get_lines()
     interpreted = dsmr.interpret(lines)
-    print(interpreted)
+    print(datetime.now(), interpreted)
     process_reading(
             watt_current=get_reading(interpreted, "current_electricity"),
             watt_total_low=get_reading(interpreted, "total_electricity_low"),
