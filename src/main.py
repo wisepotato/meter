@@ -13,13 +13,13 @@ load_dotenv()
 
 # Settings
 database_type = os.getenv("DB_TYPE")
-database_host = os.getenv("DB_HOSTNAME")
+database_host = os.getenv("DB_HOST")
 database_port = int(os.getenv("DB_PORT"))
 database_username = os.getenv("DB_USERNAME")
 database_password = os.getenv("DB_PASSWORD")
 database_database = os.getenv("DB_DATABASE")
 
-current_data_interval_seconds = os.getenv("CURRENT_DATA_INTERVAL_SECONDS")
+current_data_interval_seconds = int(os.getenv("CURRENT_DATA_INTERVAL_SECONDS"))
 if current_data_interval_seconds is not None:
     current_data_interval_seconds = timedelta(0, int(current_data_interval_seconds))
 total_data_interval_seconds = os.getenv("TOTAL_DATA_INTERVAL_SECONDS")
@@ -30,6 +30,8 @@ allowed_database_types = ['influxdb']
 if database_type not in allowed_database_types:
     raise Exception(f"The database_type {database_type} is not allowed. Allowed types: {allowed_database_types}")
 
+
+
 client = InfluxDBClient(
     host=database_host,
     port=database_port,
@@ -37,6 +39,11 @@ client = InfluxDBClient(
     password=database_password,
     database=database_database
 )
+
+databases = client.get_list_database()
+database_names = [db['name'] for db in  databases]
+if database_database not in database_names:
+    client.create_database(database_database)
 
 current_wattages = []
 last_current_data_timestamp = datetime.now()
@@ -99,10 +106,13 @@ class DsmrFour():
         ser.stopbits = serial.STOPBITS_ONE
         ser.xonxoff = 0
         ser.rtscts = 0
-        ser.timeout = 12
+        ser.timeout = 60
         ser.port = "/dev/ttyUSB0"
         self._serial = ser
     
+    def close(self) -> None:
+        self._serial.close()
+
     def register(self,data_unit: DsmrInfo)  -> None:
         self._registrations.append(data_unit)
 
@@ -112,7 +122,6 @@ class DsmrFour():
             for text in lines:
                 if finder.search_for in text:
                     groups = re.findall(rf'([0-9]+[\.]+[0-9]*\*{finder.unit})',text)
-
                     text = [group.replace(f"*{finder.unit}", "") for group in groups if str(group).endswith(f"*{finder.unit}")][0]
                     actual_float = float(text)
                     data.append({
@@ -137,13 +146,16 @@ class DsmrFour():
         self._serial.open()
         self.lines = []
         while  True:
-            telegram_line = self._serial.readline()
-            telegram_line = telegram_line.decode('ascii').strip()
-            if self.end_of_telegram(telegram_line):
-                break
-            else:
-                self.lines.append(telegram_line)
-
+            try:
+                telegram_line = self._serial.readline()
+                telegram_line = telegram_line.decode('ascii').strip()
+                if self.end_of_telegram(telegram_line):
+                    break
+                else:
+                    self.lines.append(telegram_line)
+            except serial.serialutil.SerialException:
+                print("No data this time")
+           
         self._serial.close()
 
 
@@ -159,16 +171,25 @@ for du in data_units:
     dsmr.register(du)
 
 def get_reading(data: List, name: str):
-    return list(filter(lambda x: x["variable_name"] == name, data))[0]["value"]
+    filtered_list = list(filter(lambda x: x["variable_name"] == name, data))
+    # if len(filtered_list) == 0:
+    #     return None
+    return filtered_list[0]["value"]
 
-while True:
-    dsmr.wait_for_telegram_and_load()
-    lines = dsmr.get_lines()
-    interpreted = dsmr.interpret(lines)
-    print(datetime.now(), interpreted)
-    process_reading(
-            watt_current=get_reading(interpreted, "current_electricity"),
-            watt_total_low=get_reading(interpreted, "total_electricity_low"),
-            watt_total_high=get_reading(interpreted, "total_electricity_high"),
-            total_gas=get_reading(interpreted, "total_gas")
-            )
+try:
+    while True:
+        dsmr.wait_for_telegram_and_load()
+        lines = dsmr.get_lines()
+        interpreted = dsmr.interpret(lines)
+        print(datetime.now(), interpreted)
+        if len(interpreted) != 4:
+            continue
+        process_reading(
+                watt_current=get_reading(interpreted, "current_electricity"),
+                watt_total_low=get_reading(interpreted, "total_electricity_low"),
+                watt_total_high=get_reading(interpreted, "total_electricity_high"),
+                total_gas=get_reading(interpreted, "total_gas")
+                )
+except Exception as e:
+    print(e)
+    dsmr.close()

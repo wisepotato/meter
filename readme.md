@@ -11,7 +11,7 @@ This project reads out your Dutch [DSMR](https://www.netbeheernederland.nl/_uplo
 ## Environment Variables
 
 * DB_TYPE (currently only `influxdb` is supported)
-* DB_HOSTNAME
+* DB_HOST
 * DB_PORT
 * DB_USERNAME
 * DB_PASSWORD
